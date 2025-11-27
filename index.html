@@ -1,0 +1,518 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8" />
+  <title>Secret Message Link</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: #0f172a;
+      color: #e5e7eb;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+    }
+    .container {
+      width: 100%;
+      max-width: 720px;
+      background: #020617;
+      border-radius: 16px;
+      padding: 20px 20px 24px;
+      box-shadow: 0 20px 40px rgba(0,0,0,0.6);
+      border: 1px solid #1f2937;
+    }
+    h1 {
+      margin: 0 0 12px;
+      font-size: 1.4rem;
+      color: #f9fafb;
+    }
+    p.desc {
+      margin: 0 0 16px;
+      color: #9ca3af;
+      font-size: 0.9rem;
+    }
+    label {
+      display: block;
+      margin-bottom: 6px;
+      font-size: 0.9rem;
+      color: #e5e7eb;
+    }
+    input[type="text"],
+    input[type="url"],
+    textarea {
+      width: 100%;
+      padding: 10px 12px;
+      border-radius: 10px;
+      border: 1px solid #374151;
+      background: #020617;
+      color: #e5e7eb;
+      font-size: 0.9rem;
+      outline: none;
+    }
+    input:focus,
+    textarea:focus {
+      border-color: #38bdf8;
+      box-shadow: 0 0 0 1px rgba(56,189,248,0.4);
+    }
+    textarea {
+      min-height: 130px;
+      resize: vertical;
+    }
+    .field-group {
+      margin-bottom: 14px;
+    }
+    .row {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+    .row .field-group {
+      flex: 1 1 0;
+      margin-bottom: 0;
+    }
+    button {
+      border: none;
+      border-radius: 999px;
+      padding: 10px 16px;
+      font-size: 0.9rem;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: radial-gradient(circle at top left, #38bdf8, #4f46e5);
+      color: white;
+      font-weight: 500;
+      margin-top: 6px;
+    }
+    button.secondary {
+      background: #111827;
+      border: 1px solid #374151;
+      color: #e5e7eb;
+    }
+    button:active {
+      transform: translateY(1px);
+    }
+    .output-link {
+      margin-top: 12px;
+      padding: 10px 12px;
+      background: #020617;
+      border-radius: 10px;
+      border: 1px dashed #4b5563;
+    }
+    .output-link label {
+      margin-bottom: 4px;
+    }
+    .output-link-inner {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+    }
+    .output-link-inner input {
+      flex: 1;
+    }
+    .badge {
+      display: inline-block;
+      padding: 3px 8px;
+      border-radius: 999px;
+      font-size: 0.7rem;
+      background: #111827;
+      border: 1px solid #1d4ed8;
+      color: #bfdbfe;
+      margin-bottom: 8px;
+    }
+    .view-card {
+      padding: 14px 14px 16px;
+      border-radius: 14px;
+      background: radial-gradient(circle at top left, rgba(56,189,248,0.12), transparent),
+                  #020617;
+      border: 1px solid #1f2937;
+    }
+    .message-text {
+      white-space: pre-wrap;
+      word-break: break-word;
+      font-size: 0.98rem;
+      line-height: 1.6;
+      margin-bottom: 14px;
+    }
+    .section-title {
+      font-size: 0.85rem;
+      text-transform: uppercase;
+      letter-spacing: .08em;
+      color: #9ca3af;
+      margin: 10px 0 4px;
+    }
+    .chip-list {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-bottom: 8px;
+    }
+    .chip {
+      font-size: 0.8rem;
+      padding: 5px 10px;
+      border-radius: 999px;
+      background: #030712;
+      border: 1px solid #374151;
+      color: #e5e7eb;
+    }
+    .chip a {
+      color: inherit;
+      text-decoration: none;
+    }
+    .chip a:hover {
+      text-decoration: underline;
+    }
+    .counter {
+      margin-top: 8px;
+      font-size: 0.78rem;
+      color: #9ca3af;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .counter span.dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 999px;
+      background: #22c55e;
+    }
+    .small-muted {
+      font-size: 0.75rem;
+      color: #6b7280;
+      margin-top: 4px;
+    }
+    .top-bar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 10px;
+    }
+    .top-bar-right {
+      font-size: 0.75rem;
+      color: #6b7280;
+    }
+    .link-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      text-decoration: none;
+      padding: 8px 13px;
+      border-radius: 999px;
+      background: #111827;
+      border: 1px solid #4b5563;
+      font-size: 0.82rem;
+      color: #e5e7eb;
+      margin-top: 4px;
+    }
+    .link-btn:hover {
+      border-color: #38bdf8;
+    }
+
+    @media (max-width: 480px) {
+      .container { padding: 16px; }
+      h1 { font-size: 1.2rem; }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div id="edit-mode" style="display:none;">
+      <div class="top-bar">
+        <div>
+          <h1>สร้างข้อความลับแบบมีลิงก์</h1>
+          <p class="desc">พิมพ์ข้อความ ใส่ลิงก์เพลง และช่องทางติดต่อ จากนั้นกด "สร้างลิงก์" เพื่อส่งให้คนอื่นกดเข้ามาอ่าน</p>
+        </div>
+        <div class="top-bar-right">
+          โหมดสร้างลิงก์
+        </div>
+      </div>
+
+      <div class="field-group">
+        <label for="message">ข้อความของคุณ</label>
+        <textarea id="message" placeholder="ใส่อะไรก็ได้ เช่น ข้อความบอกรัก ข้อความลับ หรืออะไรที่อยากส่งให้คนพิเศษ"></textarea>
+      </div>
+
+      <div class="field-group">
+        <label for="songUrl">ลิงก์เพลง (YouTube / Spotify ฯลฯ)</label>
+        <input id="songUrl" type="url" placeholder="https://youtube.com/..., https://open.spotify.com/..." />
+      </div>
+
+      <div class="section-title">ช่องทางติดต่อ</div>
+      <div class="row">
+        <div class="field-group">
+          <label for="facebook">Facebook URL</label>
+          <input id="facebook" type="url" placeholder="https://facebook.com/ชื่อโปรไฟล์ (ไม่จำเป็นต้องใส่)" />
+        </div>
+        <div class="field-group">
+          <label for="instagram">Instagram URL</label>
+          <input id="instagram" type="url" placeholder="https://instagram.com/ชื่อไอจี (ไม่จำเป็นต้องใส่)" />
+        </div>
+      </div>
+      <div class="field-group">
+        <label for="lineId">LINE ID</label>
+        <input id="lineId" type="text" placeholder="เช่น day_123 (ไม่จำเป็นต้องใส่)" />
+      </div>
+
+      <button id="generateBtn">✨ สร้างลิงก์สำหรับส่งให้คนอื่น</button>
+
+      <div id="outputArea" class="output-link" style="display:none;">
+        <label>ลิงก์ที่สร้างได้</label>
+        <div class="output-link-inner">
+          <input id="shareLink" type="text" readonly />
+          <button id="copyBtn" class="secondary">คัดลอก</button>
+        </div>
+        <div class="small-muted">
+          ส่งลิงก์นี้ให้เพื่อน / คนพิเศษ เขาจะเห็นข้อความที่คุณพิมพ์ไว้
+        </div>
+      </div>
+    </div>
+
+    <div id="view-mode" style="display:none;">
+      <div class="top-bar">
+        <div>
+          <span class="badge">Message Viewer</span>
+          <h1>มีข้อความพิเศษถึงคุณ</h1>
+        </div>
+        <div class="top-bar-right">
+          โหมดอ่านข้อความ
+        </div>
+      </div>
+
+      <div class="view-card">
+        <div id="messageText" class="message-text"></div>
+
+        <div id="songSection" style="display:none;">
+          <div class="section-title">เพลงประกอบข้อความนี้</div>
+          <a id="songLink" class="link-btn" href="#" target="_blank" rel="noopener noreferrer">
+            🔗 เปิดเพลง
+          </a>
+          <div class="small-muted">
+            ถ้าลิงก์ใช้ไม่ได้ ให้ลองคัดลอกลิงก์จากแถบที่อยู่ของเบราว์เซอร์
+          </div>
+        </div>
+
+        <div id="contactSection" style="display:none; margin-top:10px;">
+          <div class="section-title">ช่องทางติดต่อ</div>
+          <div class="chip-list" id="chipList"></div>
+        </div>
+
+        <div id="counterBox" class="counter">
+          <span class="dot"></span>
+          <span id="counterText">กำลังโหลดจำนวนครั้งที่ถูกเปิด...</span>
+        </div>
+        <div class="small-muted">
+          ระบบนับเฉพาะเครื่องไม่ซ้ำกัน (อ้างอิงจากเบราว์เซอร์เครื่องนั้น)
+        </div>
+      </div>
+
+      <button id="backToCreate" class="secondary" style="margin-top:10px;">⬅️ สร้างข้อความของคุณเอง</button>
+    </div>
+  </div>
+
+  <script>
+    function getQueryParam(name) {
+      const params = new URLSearchParams(window.location.search);
+      return params.get(name);
+    }
+
+    function encodeData(dataObj) {
+      const json = JSON.stringify(dataObj);
+      return encodeURIComponent(json);
+    }
+
+    function decodeData(encoded) {
+      try {
+        const json = decodeURIComponent(encoded);
+        return JSON.parse(json);
+      } catch (e) {
+        console.error("Decode error:", e);
+        return null;
+      }
+    }
+
+    function simpleHash(str) {
+      let hash = 0, i, chr;
+      if (str.length === 0) return "0";
+      for (i = 0; i < str.length; i++) {
+        chr = str.charCodeAt(i);
+        hash = ((hash << 5) - hash) + chr;
+        hash |= 0;
+      }
+      return Math.abs(hash).toString();
+    }
+
+    async function setupViewCounter(messageId) {
+      const counterBox = document.getElementById("counterBox");
+      const counterText = document.getElementById("counterText");
+      if (!counterBox) return;
+
+      const localKey = "seen_" + messageId;
+      const namespace = "day-secret-message-app";
+
+      let alreadySeen = false;
+      try {
+        alreadySeen = !!localStorage.getItem(localKey);
+      } catch (e) {}
+
+      try {
+        let url;
+        if (alreadySeen) {
+          url = `https://api.countapi.xyz/get/${namespace}/${messageId}`;
+        } else {
+          url = `https://api.countapi.xyz/hit/${namespace}/${messageId}`;
+        }
+
+        const res = await fetch(url);
+        if (!res.ok) throw new Error("Counter API error");
+        const data = await res.json();
+        const count = data.value ?? data.count ?? 0;
+        counterText.textContent = `ถูกเปิดแล้ว ${count.toLocaleString("th-TH")} ครั้ง`;
+
+        if (!alreadySeen) {
+          try {
+            localStorage.setItem(localKey, "1");
+          } catch (e) {}
+        }
+      } catch (e) {
+        console.warn("ไม่สามารถโหลดตัวนับได้:", e);
+        counterText.textContent = "ไม่สามารถโหลดจำนวนครั้งที่ถูกเปิดได้ (แต่ข้อความยังใช้งานได้ปกติ)";
+      }
+    }
+
+    function initViewMode(data) {
+      const editMode = document.getElementById("edit-mode");
+      const viewMode = document.getElementById("view-mode");
+      editMode.style.display = "none";
+      viewMode.style.display = "block";
+
+      const msgEl = document.getElementById("messageText");
+      msgEl.textContent = data.message || "(ไม่มีข้อความ)";
+
+      const songSection = document.getElementById("songSection");
+      const songLink = document.getElementById("songLink");
+      if (data.songUrl && data.songUrl.trim() !== "") {
+        songLink.href = data.songUrl.trim();
+        songSection.style.display = "block";
+      } else {
+        songSection.style.display = "none";
+      }
+
+      const contactSection = document.getElementById("contactSection");
+      const chipList = document.getElementById("chipList");
+      chipList.innerHTML = "";
+      let hasContact = false;
+
+      if (data.facebook && data.facebook.trim() !== "") {
+        hasContact = true;
+        const chip = document.createElement("div");
+        chip.className = "chip";
+        const a = document.createElement("a");
+        a.href = data.facebook.trim();
+        a.target = "_blank";
+        a.rel = "noopener noreferrer";
+        a.textContent = "Facebook";
+        chip.appendChild(a);
+        chipList.appendChild(chip);
+      }
+
+      if (data.instagram && data.instagram.trim() !== "") {
+        hasContact = true;
+        const chip = document.createElement("div");
+        chip.className = "chip";
+        const a = document.createElement("a");
+        a.href = data.instagram.trim();
+        a.target = "_blank";
+        a.rel = "noopener noreferrer";
+        a.textContent = "Instagram";
+        chip.appendChild(a);
+        chipList.appendChild(chip);
+      }
+
+      if (data.lineId && data.lineId.trim() !== "") {
+        hasContact = true;
+        const chip = document.createElement("div");
+        chip.className = "chip";
+        chip.textContent = "LINE: " + data.lineId.trim();
+        chipList.appendChild(chip);
+      }
+
+      contactSection.style.display = hasContact ? "block" : "none";
+
+      const messageId = simpleHash(JSON.stringify(data));
+      setupViewCounter(messageId);
+
+      document.getElementById("backToCreate").addEventListener("click", () => {
+        const baseUrl = window.location.origin + window.location.pathname;
+        window.location.href = baseUrl;
+      });
+    }
+
+    function initEditMode() {
+      const editMode = document.getElementById("edit-mode");
+      const viewMode = document.getElementById("view-mode");
+      editMode.style.display = "block";
+      viewMode.style.display = "none";
+
+      const generateBtn = document.getElementById("generateBtn");
+      const outputArea = document.getElementById("outputArea");
+      const shareLinkInput = document.getElementById("shareLink");
+      const copyBtn = document.getElementById("copyBtn");
+
+      generateBtn.addEventListener("click", () => {
+        const message = document.getElementById("message").value.trim();
+        const songUrl = document.getElementById("songUrl").value.trim();
+        const facebook = document.getElementById("facebook").value.trim();
+        const instagram = document.getElementById("instagram").value.trim();
+        const lineId = document.getElementById("lineId").value.trim();
+
+        if (!message) {
+          alert("กรุณาใส่ข้อความอย่างน้อย 1 บรรทัดก่อนสร้างลิงก์นะ");
+          return;
+        }
+
+        const data = { message, songUrl, facebook, instagram, lineId };
+        const encoded = encodeData(data);
+
+        const baseUrl = window.location.origin + window.location.pathname;
+        const shareUrl = `${baseUrl}?d=${encoded}`;
+
+        shareLinkInput.value = shareUrl;
+        outputArea.style.display = "block";
+      });
+
+      copyBtn.addEventListener("click", async () => {
+        const shareLinkInput = document.getElementById("shareLink");
+        shareLinkInput.select();
+        shareLinkInput.setSelectionRange(0, 99999);
+        try {
+          await navigator.clipboard.writeText(shareLinkInput.value);
+          copyBtn.textContent = "คัดลอกแล้ว";
+          setTimeout(() => copyBtn.textContent = "คัดลอก", 1500);
+        } catch (e) {
+          document.execCommand("copy");
+          copyBtn.textContent = "คัดลอกแล้ว";
+          setTimeout(() => copyBtn.textContent = "คัดลอก", 1500);
+        }
+      });
+    }
+
+    (function init() {
+      const d = getQueryParam("d");
+      if (d) {
+        const data = decodeData(d);
+        if (data && typeof data === "object") {
+          initViewMode(data);
+          return;
+        }
+      }
+      initEditMode();
+    })();
+  </script>
+</body>
+</html>
