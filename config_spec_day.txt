@@ -1,0 +1,508 @@
+ชื่อไฟล์ (แนะนำ): config_spec_day.txt
+
+----------------------------------------
+A. ภาพรวมระบบหน้าเว็บ Config
+----------------------------------------
+หน้าเว็บนี้ใช้สำหรับตั้งค่าระบบเซนเซอร์และอุปกรณ์บนบอร์ดไมโครคอนโทรลเลอร์ (เช่น ESP32 / RP2040 + WiFi) ผ่าน HTTP API /config (GET/POST)
+
+โครงหลักการทำงาน:
+- โหลดค่า config จาก MCU หรือจาก localStorage
+- แก้ไขค่าต่าง ๆ ผ่านฟอร์ม
+- บันทึกและส่ง config กลับไปให้ MCU ในรูปแบบ JSON
+- มีโหมดผู้ดูแล (Admin) เพื่อปลดล็อกค่าที่ละเอียด/อันตราย เช่น ค่า limit, ค่าคาร์บูฯ
+
+----------------------------------------
+B. โหมดผู้ดูแล (Admin Mode)
+----------------------------------------
+ส่วนที่เกี่ยวข้อง:
+- แสดงสถานะ: "โหมด: ผู้ใช้ทั่วไป" หรือ "โหมด: ผู้ดูแล"
+- ปุ่ม: "เข้าสู่โหมดผู้ดูแล" / "ออกจากโหมดผู้ดูแล"
+- ฟิลด์ที่มี tag locked-field จะแก้ได้เฉพาะในโหมดผู้ดูแล เช่น:
+  - tempHigh
+  - humiHigh
+  - currentHigh
+  - voltageLow
+  - carbValue
+  - carbMaxLimit
+  - enableLogging
+
+หน้าที่:
+- ป้องกันผู้ใช้ทั่วไปไม่ให้ปรับค่าที่กระทบความปลอดภัยหรือการทำงานหลักของระบบ
+
+ไอเดียฟังก์ชันที่อาจมีในระบบ:
+- การยืนยันรหัสผ่านฝั่งเว็บ (ทำแล้ว)
+- หากต้องการขั้นสูง: อาจเพิ่ม token ฝั่ง MCU สำหรับเซสชัน admin (ออปชันเพิ่มเติม)
+
+
+----------------------------------------
+C. ระบบทั่วไป (General System Settings)
+----------------------------------------
+ฟิลด์ที่มี:
+1) sampleInterval (ms)
+   - ช่วงเวลาในการอ่านค่าจากเซนเซอร์
+   - ตัวอย่าง: 1000 = อ่านทุก 1 วินาที
+
+2) tempUnit (C/F)
+   - หน่วยอุณหภูมิที่ใช้แสดงผล (Celsius หรือ Fahrenheit)
+
+3) enableSerial (true/false)
+   - เปิด/ปิดการส่งข้อมูลออก Serial Monitor
+
+4) enableLogging (true/false) [ฟิลด์ขั้นสูง / locked]
+   - เปิด/ปิดการเก็บ Log ในหน่วยความจำ MCU เช่น EEPROM / Flash / SD
+
+ฟังก์ชันใน MCU ที่เกี่ยวข้อง:
+- applyGeneralConfig()
+  - ตั้งตัวแปร global เช่น sampleInterval, useFahrenheit, serialEnabled, loggingEnabled
+- loopReadSensors()
+  - ใช้ sampleInterval เป็นตัวกำหนดว่าจะอ่านเซนเซอร์เมื่อไร
+- logDataIfEnabled()
+  - ตรวจ loggingEnabled ก่อนบันทึกข้อมูลลง storage
+
+
+----------------------------------------
+D. การแสดงผลจอ (Display Settings – TFT)
+----------------------------------------
+ฟิลด์ที่มี:
+1) displayBrightness (10–255)
+   - ระดับความสว่างหน้าจอ TFT (ใช้กับ PWM backlight)
+
+2) displayTimeout (วินาที)
+   - ระยะเวลาที่ไม่มีกิจกรรม (ไม่มีปุ่มกด) แล้วจอจะดับเอง
+
+3) defaultPage (0, 1, 2)
+   - กำหนดว่าระบบจะเปิดที่หน้าไหนเป็นหน้าแรก
+   - 0 = Env (สิ่งแวดล้อม)
+   - 1 = Power (กระแส/แรงดัน)
+   - 2 = RTC/Distance (เวลา + ระยะ)
+
+ฟังก์ชันใน MCU ที่เกี่ยวข้อง:
+- applyDisplayConfig()
+  - ตั้งค่า PWM ให้ตรงกับ displayBrightness
+- handleDisplayTimeout()
+  - นับเวลา idle ตาม displayTimeout แล้วปิด/พักจอ
+- showPage(uint8_t page)
+  - ใช้ defaultPage ตอนเริ่มระบบ และสลับหน้าตามการกดปุ่ม
+
+
+----------------------------------------
+E. เซนเซอร์ & Trigger – กลุ่มสิ่งแวดล้อม (BME280 / BH1750)
+----------------------------------------
+ฟิลด์ที่มี:
+1) tempHigh (°C) [locked-field]
+   - อุณหภูมิสูงสุดที่ถือว่าเกิน limit
+
+2) humiHigh (%) [locked-field]
+   - ความชื้นสัมพัทธ์สูงสุดที่ถือว่าเกิน limit
+
+3) lightLow (lux)
+   - ค่าแสงต่ำกว่าที่ถือว่า "มืดเกิน"
+
+4) autoBacklight (true/false)
+   - เปิด/ปิดฟังก์ชันปรับความสว่างจออัตโนมัติตามค่า lux
+
+ฟังก์ชันใน MCU ที่เกี่ยวข้อง:
+- checkEnvAlarms()
+  - ถ้า temp > tempHigh → ตั้ง flag tempAlarm
+  - ถ้า humi > humiHigh → ตั้ง flag humiAlarm
+  - ถ้า lux < lightLow → ตั้ง flag lightAlarm
+- handleAutoBacklight()
+  - อ่านค่า lux จาก BH1750
+  - map ค่า lux → ระดับ displayBrightness แล้วอัปเดตจอ
+
+
+----------------------------------------
+F. เซนเซอร์ & Trigger – พลังงาน/ระยะ (INA219 / VL53L0X)
+----------------------------------------
+ฟิลด์ที่มี:
+1) currentHigh (mA) [locked-field]
+   - กระแสสูงสุดที่ถือว่าโหลดเกิน
+
+2) voltageLow (V) [locked-field]
+   - แรงดันต่ำสุดที่ถือว่าไฟตก/แบตอ่อน
+
+3) distanceAlarm (mm)
+   - ระยะที่ต้องการเตือน เช่น ถ้าเข้าใกล้กว่านี้ให้เตือน
+
+4) distanceInvert (true/false)
+   - false: ระยะน้อยกว่า distanceAlarm = อันตราย/เตือน
+   - true: ระยะมากกว่า distanceAlarm = อันตราย/เตือน (ตีความกลับด้าน)
+
+ฟังก์ชันใน MCU ที่เกี่ยวข้อง:
+- checkPowerAlarms()
+  - current_mA > currentHigh → ตั้ง powerAlarm
+  - busVoltage < voltageLow → ตั้ง voltageAlarm
+- checkDistanceAlarm()
+  - ถ้า distanceInvert == false:
+      distance_mm < distanceAlarm → ตั้ง distanceAlarmFlag
+  - ถ้า distanceInvert == true:
+      distance_mm > distanceAlarm → ตั้ง distanceAlarmFlag
+
+
+----------------------------------------
+G. ระบบเสียงเตือน (Buzzer)
+----------------------------------------
+ฟิลด์ที่มี:
+1) buzzerEnable (true/false)
+   - เปิด/ปิดการทำงานของ buzzer ทั้งระบบ
+
+2) buzzerLevel (0–255)
+   - ระดับความดัง (ใช้ร่วมกับ PWM หรือกำหนดเป็น intensity)
+
+3) buzzerDuration (ms)
+   - ระยะเวลาส่งเสียงเตือนต่อครั้ง
+
+4) buzzerMode (short / double / continuous)
+   - short = เตือนสั้น 1 ครั้ง
+   - double = เตือน 2 ครั้ง
+   - continuous = เตือนค้างจนกว่าจะเคลียร์/เงื่อนไขหาย
+
+ฟังก์ชันใน MCU ที่เกี่ยวข้อง:
+- buzzerAlertOnce()
+- buzzerAlertDouble()
+- buzzerAlertContinuous(bool on)
+- handleAlarmsToBuzzer()
+  - ตรวจ flag ต่าง ๆ แล้วเรียกฟังก์ชันตาม buzzerMode และ buzzerEnable
+
+
+----------------------------------------
+H. การแม็ปปุ่มกด (Button Mapping)
+----------------------------------------
+ฟิลด์ที่มี:
+1) btn1Action
+   - nextPage / buzzerTest / none
+
+2) btn2Action
+   - buzzerTest / resetAlarm / none
+
+3) btn3Action
+   - toggleSerial / none
+
+4) btn4Action
+   - sleepDisplay / none
+
+หน้าที่:
+- ผู้ใช้สามารถกำหนด behavior ของปุ่มได้เอง
+- เปลี่ยนฟังก์ชันได้จากหน้าเว็บโดยไม่ต้องแก้โค้ด MCU
+
+ฟังก์ชันใน MCU ที่เกี่ยวข้อง:
+- scanButtons()
+  - อ่านปุ่ม, ทำดีบาวซ์, ตรวจ state เปลี่ยนจาก HIGH → LOW
+- handleButton(uint8_t id)
+  - แปล btnXAction เป็นคำสั่งจริง เช่น
+    - nextPage()
+    - buzzerTest()
+    - resetAlarms()
+    - toggleSerialOutput()
+    - sleepDisplay()
+
+
+----------------------------------------
+I. โหมดขั้นสูง – ค่าคาร์บูฯ / ค่าปรับจูนสำคัญ (Advanced / Carb)
+----------------------------------------
+ฟิลด์ที่มี:
+1) carbValue
+   - ค่าคาร์บูเรเตอร์ หรือค่าปรับจูนที่เดย์ต้องการใช้ (แล้วแต่กำหนดความหมาย)
+   - เช่น ค่า AFR เป้าหมาย, ค่า compensation, ค่า duty ปรับละเอียด ฯลฯ
+
+2) carbMaxLimit
+   - ค่าสูงสุดที่อนุญาตให้ carbValue ไปถึง
+   - ป้องกันไม่ให้ใครตั้งค่าเกินช่วงที่ปลอดภัย
+
+ทั้งสองฟิลด์เป็น locked-field:
+- แก้ได้เฉพาะเมื่อเข้าสู่โหมดผู้ดูแล (ใส่รหัสผ่านถูกต้อง)
+
+ฟังก์ชันใน MCU ที่เกี่ยวข้อง:
+- applyCarbConfig()
+  - ถ้า carbValue > carbMaxLimit → clamp = carbMaxLimit
+  - นำ carbValue ไปใช้ในสมการควบคุมที่เดย์ออกแบบ (เช่น แผนที่น้ำมัน/อากาศ)
+- getSafeCarbValue()
+  - คืนค่า carbValue ที่ผ่านการตรวจแล้ว (ไม่เกิน limit)
+
+
+----------------------------------------
+J. ปุ่มด้านล่าง + สถานะ + Preview JSON
+----------------------------------------
+ปุ่มบนหน้าเว็บ:
+- โหลดจาก MCU (GET /config)
+- ค่าเริ่มต้น (รีเซ็ตค่ากลับ defaultConfig ในหน้าเว็บ)
+- ลบ config ใน browser (ล้าง localStorage)
+- บันทึก & ส่งไป MCU (POST /config)
+
+ส่วนแสดงผล:
+- status: แสดงข้อความสถานะ เช่น
+  - "โหลดจาก MCU สำเร็จ"
+  - "ส่งไป MCU ไม่สำเร็จ"
+- preview: แสดง JSON ของ currentConfig
+
+ฟังก์ชัน / API ฝั่ง MCU ที่ควรมี:
+1) โครงสร้าง struct Config
+   - รวมทุกฟิลด์:
+     sampleInterval, tempUnit, enableSerial, enableLogging,
+     displayBrightness, displayTimeout, defaultPage,
+     tempHigh, humiHigh, lightLow, autoBacklight,
+     currentHigh, voltageLow, distanceAlarm, distanceInvert,
+     buzzerEnable, buzzerLevel, buzzerDuration, buzzerMode,
+     btn1Action, btn2Action, btn3Action, btn4Action,
+     carbValue, carbMaxLimit
+
+2) String configToJson()
+   - แปลงค่าจาก struct Config → JSON (ใช้ ArduinoJson)
+
+3) void jsonToConfig(String body)
+   - แปลง JSON → struct Config
+   - เรียกฟังก์ชัน applyGeneralConfig(), applyDisplayConfig(), applyCarbConfig(), ฯลฯ
+
+4) Handler HTTP:
+   - handleGetConfig()
+     - ตอบกลับ JSON ปัจจุบัน
+   - handlePostConfig()
+     - รับ JSON ใหม่, แปลง, เซฟ, ตอบ "OK"
+
+5) การเก็บค่าแบบถาวร (ออปชัน):
+   - loadConfigFromFlash()
+   - saveConfigToFlash()
+   - จะใช้ NVS, EEPROM, LittleFS, SPIFFS, SD แล้วแต่เดย์เลือก
+
+
+----------------------------------------
+K. ไอเดียขยายต่อในอนาคต
+----------------------------------------
+- เพิ่มหัวข้อ WiFi/MQTT/Cloud (เช่น broker, topic, interval ส่งข้อมูล)
+- เพิ่มหัวข้อ Logging (interval, เลือกเซนเซอร์ที่จะ log)
+- เพิ่มหน้า Map สำหรับ ECU/Engine Tuning (ตารางค่า rpm vs load)
+- เพิ่มระบบสำรอง/กู้ค่า config (Export/Import เป็นไฟล์ .json)
+- เพิ่มกราฟเล็ก ๆ บนหน้าเว็บ (ใช้ JavaScript วาดจากค่าตัวอย่าง)
+
+
+========================================
+L. ระบบจัดการรูปภาพ (Image System)
+========================================
+วัตถุประสงค์:
+- ให้ผู้ใช้สามารถอัปโหลดรูปภาพจากหน้าเว็บ → เก็บใน Flash (LittleFS/SPIFFS)
+- เลือกรูปเพื่อแสดงบนจอ TFT
+- ลบรูปที่ไม่ใช้แล้ว
+
+ฟิลด์/แนวคิดหลักใน Config:
+- imageAutoShow (true/false)
+  - ถ้า true: แสดงรูปล่าสุดที่เลือกตอนเปิดเครื่อง
+- imageLastFile (string)
+  - ชื่อไฟล์รูปสุดท้ายที่ถูกเลือกแสดง
+
+API ฝั่ง MCU (HTTP):
+- POST /upload_image
+  - รับไฟล์ภาพจากหน้าเว็บ (เช่น .jpg, .bmp) แล้วเก็บที่ /img/
+- GET /images
+  - ตอบ JSON รายชื่อไฟล์ภาพทั้งหมดใน /img
+- POST /delete_image?file=<ชื่อไฟล์>
+  - ลบไฟล์รูปตามชื่อ
+- POST /show_image?file=<ชื่อไฟล์>
+  - MCU อ่านไฟล์แล้ววาดรูปบน TFT และบันทึก imageLastFile
+
+ฟังก์ชันใน MCU:
+- handleUploadImage()
+- handleListImages()
+- handleDeleteImage()
+- handleShowImage()
+- drawImage(const char *filename, int x, int y)
+  - ใช้ไลบรารี JPEG/BMP Decoder ตามรูปแบบไฟล์
+- applyImageConfig()
+  - ถ้า imageAutoShow == true และ imageLastFile มีค่า → แสดงภาพนั้นตอนบูต
+
+
+========================================
+M. ระบบควบคุมเพลง / แสดงสถานะเพลง (Music / YouTube Control)
+========================================
+วัตถุประสงค์:
+- แสดงสถานะการเล่นเพลงที่มาจากอุปกรณ์อื่น (เช่น มือถือที่เปิด YouTube)
+- มีปุ่มควบคุมพื้นฐานจากหน้าเว็บ: หยุดเพลง, เพิ่มเสียง, ลดเสียง, เพลงถัดไป
+- MCU แสดงชื่อเพลง/สถานะบนจอ TFT
+
+หมายเหตุ:
+- การควบคุม YouTube จริง ๆ จะต้องใช้:
+  - Web Bluetooth / Web HID / หรือ API จากอุปกรณ์ที่เล่นเพลง
+  - MCU ทำหน้าที่รับคำสั่ง + แสดงผล (หรือ Forward คำสั่งต่อไปยัง gateway)
+
+ฟิลด์ใน Config (ตัวอย่าง):
+1) musicControlEnabled (true/false)
+   - เปิด/ปิดฟังก์ชันควบคุมเพลงจากเว็บ
+2) musicSourceName (string)
+   - ชื่ออุปกรณ์ที่กำลังเล่นเพลง (เช่น "Phone-Day", "PC-Livingroom")
+3) musicLastTitle (string)
+   - ชื่อเพลงล่าสุดที่แสดง (ใช้เพื่อโชว์บนจอ)
+4) musicVolume (0–100)
+   - ระดับเสียงเชิงตรรกะ (ใช้ sync กับอุปกรณ์ภายนอก)
+
+API ฝั่ง MCU (HTTP):
+- POST /music/pause
+- POST /music/volup
+- POST /music/voldown
+- POST /music/next
+- GET  /music/status
+  - ส่ง JSON:
+    - playing (true/false)
+    - title (string)
+    - volume (0–100)
+    - source (string)
+
+ฟังก์ชันใน MCU:
+- updateMusicStatus(String title, int volume, bool playing)
+  - ใช้เมื่อได้รับข้อมูลสถานะจากแหล่งอื่น
+- displayMusicStatus()
+  - แสดง "title / volume / play-pause icon" บนหน้าจอ
+- handleMusicCommandPause()
+- handleMusicCommandVolUp()
+- handleMusicCommandVolDown()
+- handleMusicCommandNext()
+  - แต่ละฟังก์ชันจะ:
+    - ตั้ง flag หรือส่งคำสั่งต่อออกทาง Serial/WiFi ไปยัง gateway อื่น
+    - หรือในระบบที่เดย์ออกแบบเอง
+
+ฝั่งหน้าเว็บ:
+- ปุ่ม:
+  - หยุดเพลง (Pause/Play)
+  - เพิ่มเสียง
+  - ลดเสียง
+  - เพลงถัดไป
+- กล่องแสดง:
+  - ชื่อเพลง
+  - ชื่ออุปกรณ์
+  - สถานะ (Playing/Paused)
+  - Volume bar
+
+
+========================================
+N. ระบบเซตอัป Wi-Fi ครั้งแรก + เวลาอัตโนมัติ + พยากรณ์อากาศ
+========================================
+วัตถุประสงค์:
+- ครั้งแรกที่เปิดเครื่อง ให้บอร์ดสร้าง Wi-Fi AP ของตัวเอง
+- แสดงชื่อ Wi-Fi และรหัสผ่านบนจอ → ผู้ใช้ต่อเข้าไปเพื่อเซตค่าผ่านเว็บ
+- สามารถตั้งค่า:
+  - ชื่อ SSID AP ของบอร์ดว่าจะเปิด/ปิด และชื่อว่าอะไร
+  - ชื่อ/รหัส Wi-Fi Router เพื่อให้ MCU ต่อเน็ต
+- เมื่อต่อเน็ตได้แล้ว:
+  - ดึงเวลาอัตโนมัติจาก NTP
+  - ดึงวันจันทร์–อาทิตย์, วว/ดด/ปปปป ทั้งแบบ พ.ศ. และ ค.ศ.
+  - ดึงพยากรณ์อากาศวันนี้มาแสดง
+
+ฟิลด์ใน Config:
+1) apEnabled (true/false)
+   - เปิด/ปิดโหมด AP (Wi-Fi ที่บอร์ดปล่อยออกมาเอง)
+
+2) apSSID (string)
+   - ชื่อ Wi-Fi ที่บอร์ดปล่อย (เช่น "Day-Setup")
+
+3) apPassword (string)
+   - รหัสผ่านสำหรับ AP
+
+4) staSSID (string)
+   - SSID ของ Wi-Fi Router ที่จะเชื่อมต่อออกอินเทอร์เน็ต
+
+5) staPassword (string)
+   - รหัสผ่านของ Wi-Fi Router
+
+6) timeZoneOffset (int)
+   - Offset เขตเวลา เช่น +7 สำหรับไทย
+
+7) locationName (string)
+   - ตำแหน่ง/เมืองสำหรับดึงพยากรณ์อากาศ (เช่น "Bangkok,TH")
+
+8) weatherEnabled (true/false)
+   - เปิด/ปิดการดึงพยากรณ์อากาศ
+
+----------------------------------------
+N1. การทำงานโหมดเริ่มต้น (First-time Setup)
+----------------------------------------
+ขั้นตอน:
+1) ถ้าโหลด config แล้วพบว่า staSSID ว่าง → เข้าสู่ Setup Mode
+2) MCU เปิด AP:
+   - SSID: apSSID (default เช่น "Day-Setup")
+   - Password: apPassword (เช่น "12345678")
+3) แสดงบนหน้าจอ:
+   - "เชื่อมต่อ Wi-Fi: Day-Setup"
+   - "รหัสผ่าน: 12345678"
+   - "เปิด http://192.168.4.1 เพื่อเซตค่า"
+
+ฟังก์ชัน MCU:
+- startWiFiAP()
+- stopWiFiAP()
+- handleWiFiSetupPage()
+  - แสดงหน้า HTML มีฟอร์ม:
+    - ตั้ง apEnabled, apSSID, apPassword
+    - ตั้ง staSSID, staPassword
+- handleSaveWiFiConfig()
+  - รับ POST จากฟอร์ม, เซฟลง Flash/NVS
+- connectToWiFiRouter()
+  - ใช้ staSSID / staPassword เชื่อมต่อเราเตอร์
+
+----------------------------------------
+N2. การดึงเวลาอัตโนมัติ (NTP)
+----------------------------------------
+หลังจากเชื่อมต่อ Wi-Fi Router สำเร็จ:
+- MCU เรียกฟังก์ชัน syncTimeNTP()
+- ดึงเวลา UTC จาก NTP server (เช่น pool.ntp.org)
+- ปรับด้วย timeZoneOffset เป็นเวลาท้องถิ่น
+
+ค่าเวลาที่ต้องคำนวณ/เก็บ:
+- ชั่วโมง:นาที:วินาที → HH:MM:SS
+- วันในสัปดาห์ → จันทร์–อาทิตย์
+- วันที่/เดือน/ปี ค.ศ.
+- วันที่/เดือน/ปี พ.ศ. = ค.ศ. + 543
+
+ฟังก์ชัน MCU:
+- syncTimeNTP()
+- getLocalTimeStruct()
+- displayDateTime()
+  - แสดง:
+    - เวลา HH:MM:SS
+    - วัน จันทร์–อาทิตย์
+    - วว/ดด/ปปปป (ค.ศ. และ พ.ศ.)
+
+----------------------------------------
+N3. การดึงพยากรณ์อากาศวันนี้
+----------------------------------------
+ใช้บริการเช่น OpenWeatherMap (ต้องมี API key ฝั่ง MCU หรือ gateway)
+
+ข้อมูลที่ต้องดึง:
+- อุณหภูมิ (Temp)
+- ความชื้น (Humidity)
+- สภาพอากาศ (Clear / Clouds / Rain ฯลฯ)
+- ข้อความสั้น ๆ เช่น "ฝนตก", "ท้องฟ้าเปิด"
+- อาจดึง icon code เพื่อไปแสดงรูป icon บนจอ
+
+ฟังก์ชัน MCU:
+- fetchWeather()
+  - สร้าง HTTP GET ไปยัง API ของอากาศ โดยใช้ locationName
+  - Parse JSON แล้วเก็บค่า temp/humi/status
+- displayWeather()
+  - แสดงผลสภาพอากาศวันนี้บนจอ เช่น:
+    - "Bangkok: 32°C, FH 70%, ฝนเล็กน้อย"
+
+----------------------------------------
+N4. การผูกทั้งหมดเข้ากับหน้าเว็บ Config
+----------------------------------------
+บนหน้าเว็บ Config:
+
+หมวด "Wi-Fi & Network":
+- ช่องกรอก:
+  - เปิด/ปิด AP: apEnabled
+  - ชื่อ AP: apSSID
+  - รหัส AP: apPassword
+  - ชื่อ Wi-Fi Router: staSSID
+  - รหัส Wi-Fi Router: staPassword
+
+หมวด "Time & Weather":
+- เลือก timeZoneOffset
+- ใส่ locationName
+- เปิด/ปิด weatherEnabled
+- ปุ่ม "Sync เวลาเดี๋ยวนี้" (เรียก API /time/sync)
+- แสดง preview:
+  - เวลาปัจจุบัน
+  - วันที่แบบ ค.ศ. และ พ.ศ.
+  - ข้อมูลพยากรณ์อากาศวันนี้
+
+API เพิ่มเติมฝั่ง MCU (ตัวอย่าง):
+- POST /wifi/save        → บันทึกค่า Wi-Fi จากหน้าเว็บ
+- POST /time/sync        → บังคับให้ sync NTP เดี๋ยวนั้น
+- GET  /time/status      → ส่งเวลาปัจจุบันกลับหน้าเว็บ
+- GET  /weather/status   → ส่งข้อมูลพยากรณ์ปัจจุบัน
